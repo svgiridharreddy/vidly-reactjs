@@ -1,7 +1,7 @@
 import React from 'react';
 import Joi from 'joi-browser';
-import {getMovie,saveMovie} from '../services/fakeMovieService';
-import {getGenres} from '../services/fakeGenreService';
+import {getMovie,saveMovie} from '../services/movieService';
+import {getGenres} from '../services/genreService';
 import Form from './common/form';
 
 
@@ -25,35 +25,46 @@ class MovieForm extends Form {
     dailyRentalRate: Joi.number().min(0).max(10).required().label("Daily Rental Rate")
   }
   
-  componentDidMount(){
-    const genres = getGenres();
+  async populateGeneres(){
+    const {data: genres} = await getGenres();
     this.setState({genres})
-    const movieId =this.props.match.params.id
-    if(movieId === "new") return;
-    const movie = getMovie(movieId)
-    if(!movie) return this.props.history.replace("/not-found")
-    this.setState({data: this.mapToViewModel(movie)})
+  }
+
+  async populateMovie(){
+    try {
+      const movieId =this.props.match.params.id
+      if(movieId === "new") return;
+      const {data: movie} = await getMovie(movieId)
+      this.setState({data: this.mapToViewModel(movie)})
+    } catch (error) {
+        if(error.response && error.response.status === 404)
+          this.props.history.replace("/not-found")
+    }
+  }
+
+  async componentDidMount(){
+    await this.populateGeneres();
+    await this.populateMovie();
   }
   
   mapToViewModel(movie){
     return {
       _id: movie._id,
       title: movie.title,
-      genereId: movie.genre._id,
+      genreId: movie.genre._id,
       numberInStock: movie.numberInStock,
       dailyRentalRate: movie.dailyRentalRate
     }
   }
 
-  doSubmit = () => {
-    saveMovie(this.state.data)
+  doSubmit = async () => {
+    await saveMovie(this.state.data)
     this.props.history.push("/movies")
   }
 
   render() { 
     return (
       <form onSubmit={this.handleSubmit}>
-        <h1>Movie form {this.props.match.params.id}</h1>
         {this.renderInput("title","Title")}
         {this.renderSelect("genreId","Genre",this.state.genres)}
         {this.renderInput("numberInStock","Number in Stock")}
